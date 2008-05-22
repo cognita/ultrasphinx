@@ -1,5 +1,6 @@
 class Seller < ActiveRecord::Base
-  belongs_to :user  
+  belongs_to :user
+  has_and_belongs_to_many :categories
   delegate :address, :to => :user
   
   is_indexed :fields => [
@@ -8,6 +9,13 @@ class Seller < ActiveRecord::Base
     'created_at', 
     :capitalization, 
     :user_id
+  ],
+    :concatenate => [
+      { :class_name => 'Category',
+        :field => 'categories_sellers.category_id',
+        :as => 'category_id',
+        :association_sql => 'left outer join categories_sellers on categories_sellers.seller_id = sellers.id'
+      }
   ],
     :delta => true
   

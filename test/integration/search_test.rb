@@ -198,6 +198,39 @@ class SearchTest < Test::Unit::TestCase
       S.new(:class_names => 'Seller', :filters => {'company_name' => 'seller17'}).run.size
     )  
   end
+
+  def test_integer_filter_single
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id = 1"), #20
+      S.new(:class_names => 'Seller', :filters => {'category_id' => 1 }).run.size
+    )
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id = 4"), #1
+      S.new(:class_names => 'Seller', :filters => {'category_id' => 4 }).run.size
+    )
+  end
+
+  def test_integer_filter_array
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id in (1,4)"), #20
+      S.new(:class_names => 'Seller', :filters => {'category_id' => [1,2] }).run.size
+    )
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id in (4,5)"), #2
+      S.new(:class_names => 'Seller', :filters => {'category_id' => [4,5] }).run.size
+    )
+  end
+
+  def test_integer_filter_range
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id in (1,2,3)"), #20
+      S.new(:class_names => 'Seller', :filters => {'category_id' => (1..3) }).run.size
+    )
+    assert_equal(
+      Seller.count(:include => :categories, :conditions => "categories.id in (4,5)"), #2
+      S.new(:class_names => 'Seller', :filters => {'category_id' => (4..5) }).run.size
+    )
+  end
   
   def test_invalid_filter
     assert_raises(Ultrasphinx::UsageError) do

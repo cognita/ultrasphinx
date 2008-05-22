@@ -19,7 +19,8 @@ This is a special singleton configuration class that stores the index field conf
       'datetime' => 'date',
       'timestamp' => 'date',
       'float' => 'float',
-      'boolean' => 'bool'
+      'boolean' => 'bool',
+      'multi' => 'multi'
     }
         
     attr_accessor :classes, :types
@@ -64,6 +65,8 @@ This is a special singleton configuration class that stores the index field conf
             "sql_attr_timestamp = #{field}"
           when 'text' 
             "sql_attr_str2ordinal = #{field}" if string_sortable
+          when 'multi'
+            "sql_attr_multi = uint #{field} from field"
         end
       end
     end
@@ -82,7 +85,7 @@ This is a special singleton configuration class that stores the index field conf
       
     def null(field)      
       case types[field]
-        when 'text'
+        when 'text', 'multi'
           "''"
         when 'integer', 'float', 'bool'
           "0"
@@ -134,7 +137,17 @@ This is a special singleton configuration class that stores the index field conf
           # Regular concats are CHAR, group_concats are BLOB and need to be cast to CHAR
           options['concatenate'].to_a.each do |entry|
             extract_table_alias!(entry, klass)
-            save_and_verify_type(entry['as'], 'text', nil, klass) 
+
+            if entry['fields']
+              type = 'text'
+            else
+              extract_field_alias!(entry, klass)
+
+              field_column = klass.connection.columns(entry['table_alias']).detect { |c| c.name == entry['field'] }
+              type = field_column.type.to_s == 'integer' ? 'multi' : 'text'
+            end
+
+            save_and_verify_type(entry['as'], type, nil, klass)
             install_duplicate_fields!(entry, klass)
           end          
           

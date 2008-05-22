@@ -7,6 +7,9 @@ categories_sellers_b1:
 categories_sellers_extra1:
   seller_id: 1
   category_id: 3 # A category from the remaining categories
+categories_sellers_extra1b:
+  seller_id: 1
+  category_id: 5 # Only seller 1 has this category
 categories_sellers_a2:
   seller_id: 2
   category_id: 1 # Category 1
@@ -16,6 +19,9 @@ categories_sellers_b2:
 categories_sellers_extra2:
   seller_id: 2
   category_id: 3 # A category from the remaining categories
+categories_sellers_extra2b:
+  seller_id: 1
+  category_id: 4 # Only seller 2 has this category
 <% 3.upto(20) do |num| %>
 <%="categories_sellers_a#{num}:" %>
   seller_id: <%= num %>
