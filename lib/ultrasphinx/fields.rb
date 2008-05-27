@@ -20,7 +20,8 @@ This is a special singleton configuration class that stores the index field conf
       'timestamp' => 'date',
       'float' => 'float',
       'boolean' => 'bool',
-      'multi' => 'multi'
+      'multi' => 'multi',
+      'query' => 'query'
     }
         
     attr_accessor :classes, :types
@@ -70,8 +71,7 @@ This is a special singleton configuration class that stores the index field conf
         end
       end
     end
-    
-    
+
     def cast(source_string, field)
       if types[field] == "date"
         "UNIX_TIMESTAMP(#{source_string})"
@@ -84,18 +84,21 @@ This is a special singleton configuration class that stores the index field conf
       
       
     def null(field)      
-      case types[field]
+      default = case types[field]
         when 'text', 'multi'
           "''"
         when 'integer', 'float', 'bool'
           "0"
         when 'date'
           "18000" # Midnight on 1/1/1970
+        when 'query'
+          nil
         when nil
           raise "Field #{field} is missing"
         else
           raise "Field #{field} does not have a valid type #{types[field]}."
-      end + " AS #{field}"
+      end 
+      default + " AS #{field}" if default
     end
     
     
@@ -136,19 +139,24 @@ This is a special singleton configuration class that stores the index field conf
           
           # Regular concats are CHAR, group_concats are BLOB and need to be cast to CHAR
           options['concatenate'].to_a.each do |entry|
-            extract_table_alias!(entry, klass)
-
-            if entry['fields']
-              type = 'text'
+            if entry['doc_id']
+              # this is a query mva, add type but no group
+              save_and_verify_type(entry['as'], 'query', nil, klass) 
             else
-              extract_field_alias!(entry, klass)
+              extract_table_alias!(entry, klass)
 
-              field_column = klass.connection.columns(entry['table_alias']).detect { |c| c.name == entry['field'] }
-              type = field_column.type.to_s == 'integer' ? 'multi' : 'text'
+              if entry['fields']
+                type = 'text'
+              else
+                extract_field_alias!(entry, klass)
+
+                field_column = klass.connection.columns(entry['table_alias']).detect { |c| c.name == entry['field'] }
+                type = field_column.type.to_s == 'integer' ? 'multi' : 'text'
+              end
+
+              save_and_verify_type(entry['as'], type, nil, klass) 
+              install_duplicate_fields!(entry, klass)
             end
-
-            save_and_verify_type(entry['as'], type, nil, klass)
-            install_duplicate_fields!(entry, klass)
           end          
           
         rescue ActiveRecord::StatementInvalid

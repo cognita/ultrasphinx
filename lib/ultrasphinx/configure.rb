@@ -181,7 +181,11 @@ module Ultrasphinx
             klass, fields, options['concatenate'], column_strings, join_strings, group_bys, use_distinct, remaining_columns)
         
         column_strings = add_missing_columns(fields, remaining_columns, column_strings)
-       
+
+        mva_queries, remaining_columns = build_mva_queries(klass, options['concatenate'], class_id, remaining_columns)
+
+        mva_queries = add_missing_mva_queries(klass, fields, remaining_columns, mva_queries)
+
         ["\n# Source configuration\n\n",
          "source #{source}\n{",
           SOURCE_SETTINGS._to_conf_string,
@@ -189,11 +193,60 @@ module Ultrasphinx
           range_select_string(klass, delta_condition),
           build_query(klass, column_strings, join_strings, condition_strings, use_distinct, group_bys, order),
           "\n" + groups,
+          mva_queries,
           query_info_string(klass, class_id),
           "}\n\n"]
       end
-      
-      
+
+      #TODO add delta conditions
+      def build_mva_queries(klass, entries, class_id, remaining_columns)
+        queries = ""
+        entries.to_a.each do |entry|
+          if entry['doc_id']
+            as, doc_id, field = entry['as'], entry['doc_id'], entry['field']
+            table_name, conditions = entry['association_table'], entry['conditions']
+            
+            doc_id_column = "(#{doc_id} * #{MODEL_CONFIGURATION.size} + #{class_id}) AS id"
+            field_column = "#{field} AS #{as}"
+
+            if klass.connection.columns(table_name).detect { |c| c.name == 'id' }
+              range_column = 'id'
+            else
+              range_column = nil
+            end
+
+            group = build_mva(as, doc_id_column, field_column, table_name, conditions, range_column)
+
+            queries << group + "\n"
+            remaining_columns.delete(as)
+          end
+        end
+        [queries, remaining_columns]
+      end
+
+      def build_mva(field_name, doc_id_column, field_column, table_name, conditions=nil, range_column=nil)
+        if range_column
+          range_query = "SELECT MIN(#{range_column}), MAX(#{range_column}) FROM #{table_name}"
+          query_type = 'ranged-query'
+          range_conditions = "#{range_column} >=$start AND #{range_column} <=$end"
+        else
+          query_type = 'query'
+          range_conditions = ''
+        end
+
+        query = "SELECT #{doc_id_column}, #{field_column} FROM #{table_name}"
+
+        query << " WHERE #{range_conditions}" if query_type == 'ranged-query'
+        if conditions
+          query << (query_type == 'ranged-query' ? ' AND ' : ' WHERE ')
+          query << "(#{conditions})"
+        end
+
+        group = "sql_attr_multi = uint #{field_name} from #{query_type}; #{query}"
+        group << "; #{range_query}" if query_type == 'ranged-query'
+        group
+      end
+
       def build_query(klass, column_strings, join_strings, condition_strings, use_distinct, group_bys, order)
         
         primary_key = "#{klass.table_name}.#{klass.primary_key}"
@@ -224,9 +277,18 @@ module Ultrasphinx
       
       def add_missing_columns(fields, remaining_columns, column_strings)
         remaining_columns.each do |field|
-          column_strings << fields.null(field)
+          column_strings << fields.null(field) if fields.null(field)
         end
         column_strings
+      end
+
+      def add_missing_mva_queries(klass, fields, remaining_columns, mva_queries)
+        remaining_columns.each do |field|
+          unless fields.null(field)
+            mva_queries << "sql_attr_multi = uint #{field} from ranged-query; SELECT 0, 0 from #{klass.table_name} WHERE 0 >=$start and 0 <=$end; select 1, 1 from #{klass.table_name}" << "\n"
+          end
+        end
+        mva_queries
       end
       
 
@@ -275,7 +337,9 @@ module Ultrasphinx
         
       def build_concatenations(klass, fields, entries, column_strings, join_strings, group_bys, use_distinct, remaining_columns)
         entries.to_a.each do |entry|
-          if entry['field']
+          if entry['doc_id']
+            # do nothing (these are taken care of later)
+         elsif entry['field']
             # Group concats
   
             # Only has_many's or explicit sql right now.
