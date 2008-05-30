@@ -326,11 +326,16 @@ Note that your database is never changed by anything Ultrasphinx does.
       extra_keys = @options.keys - (self.class.query_defaults.keys + INTERNAL_KEYS)
       log "discarded invalid keys: #{extra_keys * ', '}" if extra_keys.any? and RAILS_ENV != "test" 
     end
+
+    # return the request object to allow interesting stuff (like multiple filters on the same field)
+    def request
+      @request ||= build_request_with_options(@options)
+    end
     
     # Run the search, filling results with an array of ActiveRecord objects. Set the parameter to false 
     # if you only want the ids returned.
     def run(reify = true)
-      @request = build_request_with_options(@options)
+      @request ||= build_request_with_options(@options)
 
       log "searching for #{@options.inspect}"
 
