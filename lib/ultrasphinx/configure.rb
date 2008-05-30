@@ -193,7 +193,7 @@ module Ultrasphinx
           range_select_string(klass, delta_condition),
           build_query(klass, column_strings, join_strings, condition_strings, use_distinct, group_bys, order),
           "\n" + groups,
-          mva_queries,
+          mva_queries.sort,
           query_info_string(klass, class_id),
           "}\n\n"]
       end
