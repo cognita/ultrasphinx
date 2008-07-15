@@ -204,7 +204,7 @@ module Ultrasphinx
         entries.to_a.each do |entry|
           if entry['doc_id']
             as, doc_id, field = entry['as'], entry['doc_id'], entry['field']
-            table_name, conditions = entry['association_table'], entry['conditions']
+            table_name, table_sql, conditions = entry['association_table'], entry['association_sql'], entry['conditions']
             
             doc_id_column = "(#{doc_id} * #{MODEL_CONFIGURATION.size} + #{class_id}) AS id"
             field_column = "#{field} AS #{as}"
@@ -215,7 +215,7 @@ module Ultrasphinx
               range_column = nil
             end
 
-            group = build_mva(as, doc_id_column, field_column, table_name, conditions, range_column)
+            group = build_mva(as, doc_id_column, field_column, table_name, conditions, range_column, table_sql)
 
             queries << group + "\n"
             remaining_columns.delete(as)
@@ -224,7 +224,7 @@ module Ultrasphinx
         [queries, remaining_columns]
       end
 
-      def build_mva(field_name, doc_id_column, field_column, table_name, conditions=nil, range_column=nil)
+      def build_mva(field_name, doc_id_column, field_column, table_name, conditions=nil, range_column=nil, table_sql=nil)
         if range_column
           range_query = "SELECT MIN(#{range_column}), MAX(#{range_column}) FROM #{table_name}"
           query_type = 'ranged-query'
@@ -234,8 +234,13 @@ module Ultrasphinx
           range_conditions = ''
         end
 
-        query = "SELECT #{doc_id_column}, #{field_column} FROM #{table_name}"
-
+        query = "SELECT #{doc_id_column}, #{field_column}"
+        if table_sql
+          query << " FROM #{table_sql}"
+        else
+          query << " FROM #{table_name}"
+        end
+        
         query << " WHERE #{range_conditions}" if query_type == 'ranged-query'
         if conditions
           query << (query_type == 'ranged-query' ? ' AND ' : ' WHERE ')
