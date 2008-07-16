@@ -95,7 +95,7 @@ namespace :ultrasphinx do
     desc "Rebuild the custom spelling dictionary. You may need to use 'sudo' if your Aspell folder is not writable by the app user."
     task :build => [:_environment] do    
       ENV['OPTS'] = "--buildstops #{Ultrasphinx::STOPWORDS_PATH} #{Ultrasphinx::MAX_WORDS} --buildfreqs"
-      Rake::Task["ultrasphinx:index"].invoke
+      Rake::Task["ultrasphinx:index:main"].invoke
       tmpfile = "/tmp/ultrasphinx-stopwords.txt"
       words = []
       say "filtering"
